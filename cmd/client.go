@@ -9,7 +9,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -278,7 +278,7 @@ func (d DiskCookieStore) Retrieve() (*http.Cookie, error) {
 }
 
 func (d DiskCookieStore) cookiePath() string {
-	return path.Join(d.Config.RootDir(), "cookie")
+	return filepath.Join(d.Config.RootDir(), "cookie")
 }
 
 // SessionRequestBuilder is an interface that returns a SessionRequest,

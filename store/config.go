@@ -8,7 +8,7 @@ import (
 	"math/big"
 	"net/url"
 	"os"
-	"path"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"time"
@@ -277,17 +277,17 @@ func (c Config) TLSPort() uint16 {
 
 // KeysDir returns the path of the keys directory (used for keystore files).
 func (c Config) KeysDir() string {
-	return path.Join(c.RootDir(), "keys")
+	return filepath.Join(c.RootDir(), "keys")
 }
 
 func (c Config) tlsDir() string {
-	return path.Join(c.RootDir(), "tls")
+	return filepath.Join(c.RootDir(), "tls")
 }
 
 // KeyFile returns the path where the server key is kept
 func (c Config) KeyFile() string {
 	if c.TLSKeyPath() == "" {
-		return path.Join(c.tlsDir(), "server.key")
+		return filepath.Join(c.tlsDir(), "server.key")
 	}
 	return c.TLSKeyPath()
 }
@@ -295,7 +295,7 @@ func (c Config) KeyFile() string {
 // CertFile returns the path where the server certificate is kept
 func (c Config) CertFile() string {
 	if c.TLSCertPath() == "" {
-		return path.Join(c.tlsDir(), "server.crt")
+		return filepath.Join(c.tlsDir(), "server.crt")
 	}
 	return c.TLSCertPath()
 }
@@ -386,7 +386,7 @@ type SecretGenerator interface {
 type filePersistedSecretGenerator struct{}
 
 func (f filePersistedSecretGenerator) Generate(c Config) ([]byte, error) {
-	sessionPath := path.Join(c.RootDir(), "secret")
+	sessionPath := filepath.Join(c.RootDir(), "secret")
 	if utils.FileExists(sessionPath) {
 		data, err := ioutil.ReadFile(sessionPath)
 		if err != nil {
