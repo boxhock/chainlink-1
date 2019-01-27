@@ -152,21 +152,19 @@ contract('VRF', async () => {
       assert(proofExercisesDisablingTopBitOfRingValue(proofTopBitOn),
         `Must choose proof which requires disabling the top bit in VRF#seedToRingValue.
 Find one by checking ringValueBytes[0]&128 in vrf.go/seedToRingValue`)
-      const ok = await checkProof(proofTopBitOn)
-      assert(ok, 'Proof failed')
+      assert(await checkProof(proofTopBitOn), 'Proof failed')
     })
     it('knows a good proof whose seedToRingValue is less than the modulus', async () => {
       assert(!proofExercisesDisablingTopBitOfRingValue(proofTopBitOff),
         `Must choose proof which does not require disabling the top bit in VRF#seedToRingValue.
 Find one by checking ringValueBytes[0]&128 in vrf.go/seedToRingValue`)
-      const ok = await checkProof(proofTopBitOff)
-      assert(ok, 'Proof failed')
+      assert(await checkProof(proofTopBitOff), 'Proof failed')
     })
     it('knows a bad proof', async () => {
-      const ok = await checkProof({ // eslint-disable-line no-unused-vars
+      const badProof = {
         ...proofTopBitOn, seed: proofTopBitOn.seed.add(bigNum(1))
-      })
-      assert(!ok, 'Failed to recognize a bad proof')
+      }
+      assert(!(await checkProof(badProof)), 'Failed to recognize a bad proof')
     })
   })
 })
