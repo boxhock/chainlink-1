@@ -29,7 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink/cmd"
 	"github.com/smartcontractkit/chainlink/logger"
 	"github.com/smartcontractkit/chainlink/services"
-	"github.com/smartcontractkit/chainlink/store"
+	strpkg "github.com/smartcontractkit/chainlink/store"
 	"github.com/smartcontractkit/chainlink/store/assets"
 	"github.com/smartcontractkit/chainlink/store/models"
 	"github.com/smartcontractkit/chainlink/utils"
@@ -48,11 +48,11 @@ const (
 	RootDir = "/tmp/chainlink_test"
 	// Username the test username
 	Username = "testusername"
-	// Email of the API user
+	// APIEmail of the API user
 	APIEmail = "email@test.net"
 	// Password the password
 	Password = "password"
-	// Session ID for API user
+	// APISessionID ID for API user
 	APISessionID = "session"
 	// SessionSecret is the hardcoded secret solely used for test
 	SessionSecret = "clsession_test_secret"
@@ -70,7 +70,7 @@ func init() {
 
 // TestConfig struct with test store and wsServer
 type TestConfig struct {
-	store.Config
+	strpkg.Config
 	wsServer *httptest.Server
 }
 
@@ -94,12 +94,12 @@ func NewConfigWithPrivateKey(paths ...string) (*TestConfig, func()) {
 func NewConfigWithWSServer(wsserver *httptest.Server) *TestConfig {
 	count := atomic.AddUint64(&storeCounter, 1)
 	rootdir := filepath.Join(RootDir, fmt.Sprintf("%d-%d", time.Now().UnixNano(), count))
-	rawConfig := store.NewConfig()
+	rawConfig := strpkg.NewConfig()
 	rawConfig.Set("BRIDGE_RESPONSE_URL", "http://localhost:6688")
 	rawConfig.Set("ETH_CHAIN_ID", 3)
 	rawConfig.Set("CHAINLINK_DEV", true)
 	rawConfig.Set("ETH_GAS_BUMP_THRESHOLD", 3)
-	rawConfig.Set("LOG_LEVEL", store.LogLevel{Level: zapcore.DebugLevel})
+	rawConfig.Set("LOG_LEVEL", strpkg.LogLevel{Level: zapcore.DebugLevel})
 	rawConfig.Set("MINIMUM_SERVICE_DURATION", "24h")
 	rawConfig.Set("MIN_OUTGOING_CONFIRMATIONS", 6)
 	rawConfig.Set("MINIMUM_CONTRACT_PAYMENT", minimumContractPayment.Text(10))
@@ -123,7 +123,7 @@ func (tc *TestConfig) SetEthereumServer(wss *httptest.Server) {
 // TestApplication holds the test application and test servers
 type TestApplication struct {
 	*services.ChainlinkApplication
-	Config   store.Config
+	Config   strpkg.Config
 	Server   *httptest.Server
 	wsServer *httptest.Server
 }
@@ -282,7 +282,7 @@ func (ta *TestApplication) NewClientAndRenderer() (*cmd.Client, *RendererMock) {
 		Renderer:                       r,
 		Config:                         ta.Config,
 		AppFactory:                     seededAppFactory{ta.ChainlinkApplication},
-		KeyStoreAuthenticator:          CallbackAuthenticator{func(*store.Store, string) (string, error) { return Password, nil }},
+		KeyStoreAuthenticator:          CallbackAuthenticator{func(*strpkg.Store, string) (string, error) { return Password, nil }},
 		FallbackAPIInitializer:         &MockAPIInitializer{},
 		Runner:                         EmptyRunner{},
 		HTTP:                           NewMockAuthenticatedHTTPClient(ta.Config),
@@ -301,7 +301,7 @@ func (ta *TestApplication) NewAuthenticatingClient(prompter cmd.Prompter) *cmd.C
 		Renderer:                       &RendererMock{},
 		Config:                         ta.Config,
 		AppFactory:                     seededAppFactory{ta.ChainlinkApplication},
-		KeyStoreAuthenticator:          CallbackAuthenticator{func(*store.Store, string) (string, error) { return Password, nil }},
+		KeyStoreAuthenticator:          CallbackAuthenticator{func(*strpkg.Store, string) (string, error) { return Password, nil }},
 		FallbackAPIInitializer:         &MockAPIInitializer{},
 		Runner:                         EmptyRunner{},
 		HTTP:                           cmd.NewAuthenticatedHTTPClient(ta.Config, cookieAuth),
@@ -314,15 +314,15 @@ func (ta *TestApplication) NewAuthenticatingClient(prompter cmd.Prompter) *cmd.C
 }
 
 // NewStoreWithConfig creates a new store with given config
-func NewStoreWithConfig(config *TestConfig) (*store.Store, func()) {
-	s := store.NewStore(config.Config)
+func NewStoreWithConfig(config *TestConfig) (*strpkg.Store, func()) {
+	s := strpkg.NewStore(config.Config)
 	return s, func() {
 		cleanUpStore(s)
 	}
 }
 
 // NewStore creates a new store
-func NewStore() (*store.Store, func()) {
+func NewStore() (*strpkg.Store, func()) {
 	c, cleanup := NewConfig()
 	store, storeCleanup := NewStoreWithConfig(c)
 	return store, func() {
@@ -331,18 +331,32 @@ func NewStore() (*store.Store, func()) {
 	}
 }
 
-func cleanUpStore(store *store.Store) {
+func cleanUpStore(store *strpkg.Store) {
 	defer func() {
 		if err := os.RemoveAll(store.Config.RootDir()); err != nil {
 			log.Println(err)
 		}
 	}()
 	logger.Sync()
+	wipePostgresDatabase(store)
 	mustNotErr(store.Close())
 }
 
+func wipePostgresDatabase(store *strpkg.Store) {
+	fmt.Println("--- clearing pg db:", store.ORM.DB.Dialect())
+	if store.ORM.DB.Dialect().GetName() == "postgres" {
+		logger.WarnIf(store.ORM.DB.Exec(`
+			DROP SCHEMA public CASCADE;
+			CREATE SCHEMA public;
+			GRANT ALL ON SCHEMA public TO postgres;
+			GRANT ALL ON SCHEMA public TO public;
+			COMMENT ON SCHEMA public IS 'standard public schema';
+		`).Error)
+	}
+}
+
 // NewJobSubscriber creates a new JobSubscriber
-func NewJobSubscriber() (*store.Store, services.JobSubscriber, func()) {
+func NewJobSubscriber() (*strpkg.Store, services.JobSubscriber, func()) {
 	store, cl := NewStore()
 	nl := services.NewJobSubscriber(store)
 	return store, nl, func() {
@@ -521,7 +535,7 @@ func FixtureCreateJobViaWeb(t *testing.T, app *TestApplication, path string) mod
 }
 
 // FindJob returns JobSpec for given JobID
-func FindJob(s *store.Store, id string) models.JobSpec {
+func FindJob(s *strpkg.Store, id string) models.JobSpec {
 	j, err := s.FindJob(id)
 	mustNotErr(err)
 
@@ -529,14 +543,14 @@ func FindJob(s *store.Store, id string) models.JobSpec {
 }
 
 // FindJobRun returns JobRun for given JobRunID
-func FindJobRun(s *store.Store, id string) models.JobRun {
+func FindJobRun(s *strpkg.Store, id string) models.JobRun {
 	j, err := s.FindJobRun(id)
 	mustNotErr(err)
 
 	return j
 }
 
-func FindServiceAgreement(s *store.Store, id string) models.ServiceAgreement {
+func FindServiceAgreement(s *strpkg.Store, id string) models.ServiceAgreement {
 	sa, err := s.FindServiceAgreement(id)
 	mustNotErr(err)
 
@@ -670,7 +684,7 @@ func CreateBridgeTypeViaWeb(
 // WaitForJobRunToComplete waits for a JobRun to reach Completed Status
 func WaitForJobRunToComplete(
 	t *testing.T,
-	store *store.Store,
+	store *strpkg.Store,
 	jr models.JobRun,
 ) models.JobRun {
 	return WaitForJobRunStatus(t, store, jr, models.RunStatusCompleted)
@@ -679,7 +693,7 @@ func WaitForJobRunToComplete(
 // WaitForJobRunToPendBridge waits for a JobRun to reach PendingBridge Status
 func WaitForJobRunToPendBridge(
 	t *testing.T,
-	store *store.Store,
+	store *strpkg.Store,
 	jr models.JobRun,
 ) models.JobRun {
 	return WaitForJobRunStatus(t, store, jr, models.RunStatusPendingBridge)
@@ -688,7 +702,7 @@ func WaitForJobRunToPendBridge(
 // WaitForJobRunToPendConfirmations waits for a JobRun to reach PendingConfirmations Status
 func WaitForJobRunToPendConfirmations(
 	t *testing.T,
-	store *store.Store,
+	store *strpkg.Store,
 	jr models.JobRun,
 ) models.JobRun {
 	return WaitForJobRunStatus(t, store, jr, models.RunStatusPendingConfirmations)
@@ -697,7 +711,7 @@ func WaitForJobRunToPendConfirmations(
 // WaitForJobRunStatus waits for a JobRun to reach given status
 func WaitForJobRunStatus(
 	t *testing.T,
-	store *store.Store,
+	store *strpkg.Store,
 	jr models.JobRun,
 	status models.RunStatus,
 ) models.JobRun {
@@ -714,7 +728,7 @@ func WaitForJobRunStatus(
 // JobRunStays tests if a JobRun will consistently stay at the specified status
 func JobRunStays(
 	t *testing.T,
-	store *store.Store,
+	store *strpkg.Store,
 	jr models.JobRun,
 	status models.RunStatus,
 ) models.JobRun {
@@ -731,14 +745,14 @@ func JobRunStays(
 // JobRunStaysPendingConfirmations tests if a JobRun will stay at the PendingConfirmations Status
 func JobRunStaysPendingConfirmations(
 	t *testing.T,
-	store *store.Store,
+	store *strpkg.Store,
 	jr models.JobRun,
 ) models.JobRun {
 	return JobRunStays(t, store, jr, models.RunStatusPendingConfirmations)
 }
 
 // WaitForRuns waits for the wanted number of runs then returns a slice of the JobRuns
-func WaitForRuns(t *testing.T, j models.JobSpec, store *store.Store, want int) []models.JobRun {
+func WaitForRuns(t *testing.T, j models.JobSpec, store *strpkg.Store, want int) []models.JobRun {
 	t.Helper()
 	g := gomega.NewGomegaWithT(t)
 
@@ -761,7 +775,7 @@ func WaitForRuns(t *testing.T, j models.JobSpec, store *store.Store, want int) [
 }
 
 // WaitForJobs waits for the wanted number of jobs.
-func WaitForJobs(t *testing.T, store *store.Store, want int) []models.JobSpec {
+func WaitForJobs(t *testing.T, store *strpkg.Store, want int) []models.JobSpec {
 	t.Helper()
 	g := gomega.NewGomegaWithT(t)
 
@@ -826,7 +840,7 @@ func mustNotErr(err error) {
 }
 
 // GetAccountAddress returns Address of the account in the keystore of the passed in store
-func GetAccountAddress(store *store.Store) common.Address {
+func GetAccountAddress(store *strpkg.Store) common.Address {
 	account, err := store.KeyStore.GetFirstAccount()
 	mustNotErr(err)
 
@@ -963,14 +977,14 @@ func NewSession(optionalSessionID ...string) models.Session {
 	return session
 }
 
-func AllJobs(store *store.Store) []models.JobSpec {
+func AllJobs(store *strpkg.Store) []models.JobSpec {
 	var all []models.JobSpec
 	err := store.ORM.DB.Find(&all).Error
 	mustNotErr(err)
 	return all
 }
 
-func GetLastTxAttempt(t *testing.T, store *store.Store) models.TxAttempt {
+func GetLastTxAttempt(t *testing.T, store *strpkg.Store) models.TxAttempt {
 	var attempt models.TxAttempt
 	var count int
 	err := store.ORM.DB.Order("created_at desc").First(&attempt).Count(&count).Error
