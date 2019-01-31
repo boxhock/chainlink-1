@@ -1,9 +1,8 @@
-import {resolve, join } from 'path'
-import {
+const {
   deploy,
   linkContract,
   toWei
-} from '../../../solidity/test/support/helpers'
+} = require('../../../solidity/test/support/helpers')
 
 contract('RunLog', () => {
   const arbitraryJobID =
