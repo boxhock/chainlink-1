@@ -597,7 +597,7 @@ func TestClient_ChangePassword(t *testing.T) {
 	assert.Contains(t, err.Error(), "401 Unauthorized")
 }
 
-func TestClient_GetTxAttempts(t *testing.T) {
+func TestClient_GetTransactions(t *testing.T) {
 	t.Parallel()
 
 	app, cleanup := cltest.NewApplicationWithKeyStore()
@@ -616,7 +616,7 @@ func TestClient_GetTxAttempts(t *testing.T) {
 	set.Int("page", 1, "doc")
 	c := cli.NewContext(nil, set, nil)
 	require.Equal(t, 1, c.Int("page"))
-	assert.NoError(t, client.GetTxAttempts(c))
+	assert.NoError(t, client.GetTransactions(c))
 
 	renderedAttempts := *r.Renders[0].(*[]models.TxAttempt)
 	assert.Equal(t, 1, len(renderedAttempts))
@@ -627,7 +627,7 @@ func TestClient_GetTxAttempts(t *testing.T) {
 	set.Int("page", 2, "doc")
 	c = cli.NewContext(nil, set, nil)
 	require.Equal(t, 2, c.Int("page"))
-	assert.NoError(t, client.GetTxAttempts(c))
+	assert.NoError(t, client.GetTransactions(c))
 
 	renderedAttempts = *r.Renders[1].(*[]models.TxAttempt)
 	assert.Equal(t, 0, len(renderedAttempts))
