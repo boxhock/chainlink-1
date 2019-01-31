@@ -110,7 +110,7 @@ func TestTransactionsController_Show_Success(t *testing.T) {
 
 			test.want.ID = 0
 			test.want.TxID = 0
-			assert.Equal(t, &test.want, ptx.Tx)
+			assert.Equal(t, presenters.NewTx(&test.want), ptx)
 		})
 	}
 }
