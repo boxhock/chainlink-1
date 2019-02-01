@@ -627,7 +627,7 @@ func TestClient_GetTransactions(t *testing.T) {
 	set.Int("page", 2, "doc")
 	c = cli.NewContext(nil, set, nil)
 	require.Equal(t, 2, c.Int("page"))
-	assert.NoError(t, client.GetTransactions(c))
+	assert.NoError(t, client.GetTxAttempts(c))
 
 	renderedAttempts = *r.Renders[1].(*[]models.TxAttempt)
 	assert.Equal(t, 0, len(renderedAttempts))

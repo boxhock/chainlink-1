@@ -624,10 +624,17 @@ func (orm *ORM) TxFrom(from common.Address) ([]models.Tx, error) {
 }
 
 // Transactions returns all transactions limited by passed parameters.
-func (orm *ORM) Transactions(offset, limit int) ([]models.Tx, error) {
+func (orm *ORM) Transactions(offset, limit int) ([]models.Tx, int, error) {
 	var txs []models.Tx
-	err := orm.All(&txs)
-	return txs, err
+	count, err := orm.Count(&models.Tx{})
+	if err != nil {
+		return nil, 0, err
+	}
+	query := orm.Select().OrderBy("SentAt").Reverse().Limit(limit).Skip(offset)
+	if err = query.Find(&txs); err == storm.ErrNotFound {
+		err = nil
+	}
+	return txs, count, err
 }
 
 // TxAttempts returns the last tx attempts sorted by sent at descending.
@@ -638,8 +645,7 @@ func (orm *ORM) TxAttempts(offset, limit int) ([]models.TxAttempt, int, error) {
 		return nil, 0, err
 	}
 	query := orm.Select().OrderBy("SentAt").Reverse().Limit(limit).Skip(offset)
-	err = query.Find(&attempts)
-	if err == storm.ErrNotFound {
+	if err = query.Find(&attempts); err == storm.ErrNotFound {
 		err = nil
 	}
 	return attempts, count, err
