@@ -84,22 +84,6 @@ func (tx Tx) EthTx(gasPriceWei *big.Int) *types.Transaction {
 	)
 }
 
-// GetID returns the ID of this structure for jsonapi serialization.
-func (tx Tx) GetID() string {
-	return tx.Hash.Hex()
-}
-
-// GetName returns the pluralized "type" of this structure for jsonapi serialization.
-func (tx Tx) GetName() string {
-	return "transactions"
-}
-
-// SetID is used to set the ID of this structure when deserializing from jsonapi documents.
-func (tx *Tx) SetID(value string) error {
-	tx.Hash = common.HexToHash(value)
-	return nil
-}
-
 // TxAttempt is used for keeping track of transactions that
 // have been written to the Ethereum blockchain. This makes
 // it so that if the network is busy, a transaction can be

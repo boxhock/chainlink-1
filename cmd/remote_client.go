@@ -405,7 +405,7 @@ func (cli *Client) ChangePassword(c *clipkg.Context) error {
 // taking an optional page parameter
 func (cli *Client) GetTransactions(c *clipkg.Context) error {
 	var links jsonapi.Links
-	txs := []models.Tx{}
+	txs := []presenters.Tx{}
 	if err := cli.getPage("/v2/transactions", c.Int("page"), &txs, &links); err != nil {
 		return err
 	}
